@@ -7,6 +7,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 
 class CheckProcessTimeCommand extends Command
 {
@@ -20,21 +21,40 @@ class CheckProcessTimeCommand extends Command
                 InputArgument::OPTIONAL,
                 'What is the name of the process to check?'
             )
+            ->addOption(
+                'max-time',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                'What is the max time in seconds before alerting?')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $processName = $input->getArgument('process');
-
-        $process = new Process('ps aux | grep '.$processName);
+        $maxTime = $input->getOption('max-time');
+        $process = new Process('ps -eo "%c %x" | grep '.$processName.' ');
 		$process->run();
 
 		// executes after the command finishes
 		if (!$process->isSuccessful()) {
-		    throw new \RuntimeException($process->getErrorOutput());
+		    throw new \RuntimeException("No process found with name ".$processName);
 		}
 
-        $output->writeln($process->getOutput());
+        $output->getFormatter()->setStyle('alert', new OutputFormatterStyle('red', null, array('bold')));
+        
+        $table = $this->getHelper('table');
+        $data = explode("\n", trim($process->getOutput()));
+        $table->setHeaders(array('Process', 'Time', 'Time in seconds'));
+        foreach ($data as $line) {
+            $line = explode(" ", $line);
+            sscanf($line[1], "%d:%d:%d", $hours, $minutes, $seconds);
+            $line[2] = $hours * 3600 + $minutes * 60 + $seconds;
+            if ($maxTime && $maxTime < $line[2]) {
+                $line[2] = '<alert>' . $line[2] . '</alert>';
+            }
+            $table->addRow($line);
+        }
+        $table->render($output);
     }
 }
