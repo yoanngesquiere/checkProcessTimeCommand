@@ -2,6 +2,7 @@
 namespace AppBundle\Command;
 
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -18,7 +19,7 @@ class CheckProcessTimeCommand extends Command
             ->setDescription('Check execution time of a process')
             ->addArgument(
                 'process',
-                InputArgument::OPTIONAL,
+                InputArgument::REQUIRED,
                 'What is the name of the process to check?'
             )
             ->addOption(
@@ -43,10 +44,11 @@ class CheckProcessTimeCommand extends Command
 
         $output->getFormatter()->setStyle('alert', new OutputFormatterStyle('red', null, array('bold')));
         
-        $table = $this->getHelper('table');
+        $table = new Table($output);
         $data = explode("\n", trim($process->getOutput()));
         $table->setHeaders(array('Process', 'Time', 'Time in seconds'));
         foreach ($data as $line) {
+            $line = preg_replace('/\s+/', ' ', $line);
             $line = explode(" ", $line);
             sscanf($line[1], "%d:%d:%d", $hours, $minutes, $seconds);
             $line[2] = $hours * 3600 + $minutes * 60 + $seconds;
