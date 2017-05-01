@@ -34,7 +34,7 @@ class CheckProcessTimeCommand extends Command
     {
         $processName = $input->getArgument('process');
         $maxTime = $input->getOption('max-time');
-        $process = new Process('ps -eo "%c %x" | grep '.$processName.' ');
+        $process = new Process('ps -eo "%c %t" | grep '.$processName.' ');
 		$process->run();
 
 		// executes after the command finishes
@@ -42,21 +42,36 @@ class CheckProcessTimeCommand extends Command
 		    throw new \RuntimeException("No process found with name ".$processName);
 		}
 
-        $output->getFormatter()->setStyle('alert', new OutputFormatterStyle('red', null, array('bold')));
+        $output->getFormatter()
+            ->setStyle(
+                'alert',
+                new OutputFormatterStyle('red', null, array('bold')
+                ));
         
         $table = new Table($output);
         $data = explode("\n", trim($process->getOutput()));
         $table->setHeaders(array('Process', 'Time', 'Time in seconds'));
+
+        $hours = 0;
+        $minutes = 0;
+        $seconds = 0;
+
         foreach ($data as $line) {
             $line = preg_replace('/\s+/', ' ', $line);
             $line = explode(" ", $line);
+
+            if (substr_count($line[1], ':') < 2) {
+                $line[1] = '00:'.$line[1];
+            }
+
             sscanf($line[1], "%d:%d:%d", $hours, $minutes, $seconds);
             $line[2] = $hours * 3600 + $minutes * 60 + $seconds;
             if ($maxTime && $maxTime < $line[2]) {
                 $line[2] = '<alert>' . $line[2] . '</alert>';
             }
+
             $table->addRow($line);
         }
-        $table->render($output);
+        $table->render();
     }
 }
